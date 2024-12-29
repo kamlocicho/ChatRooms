@@ -1,4 +1,4 @@
-package com.kamlocicho;
+package com.kamlocicho.server;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -11,7 +11,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Server implements Runnable {
-    private ArrayList<ConnectionHandler> connections;
+    private final ArrayList<ConnectionHandler> connections;
     private ServerSocket server;
     private boolean done;
     private ExecutorService pool;
