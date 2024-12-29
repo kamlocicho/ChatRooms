@@ -1,5 +1,7 @@
 package com.kamlocicho.server;
 
+import com.kamlocicho.common.Message;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -7,6 +9,9 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -15,9 +20,9 @@ public class Server implements Runnable {
     private ServerSocket server;
     private boolean done;
     private ExecutorService pool;
+    private final DatabaseService databaseService = new DatabaseService();
 
     public Server() {
-        System.out.println("Server is defined.");
         connections = new ArrayList<>();
         done = false;
     }
@@ -33,6 +38,7 @@ public class Server implements Runnable {
                 ConnectionHandler handler = new ConnectionHandler(client);
                 connections.add(handler);
                 pool.execute(handler);
+                loadOldMessages(handler);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -40,12 +46,29 @@ public class Server implements Runnable {
         }
     }
 
-    public void broadcast(String message) {
+    private void loadOldMessages(ConnectionHandler ch) {
+        Message[] messages = databaseService.getRecentMessages(5);
+        Arrays.stream(messages)
+                .filter(Objects::nonNull)
+                .forEach(message -> {
+                    broadcast(message, ch.getToken());
+                });
+    }
+
+    public void broadcast(Message message) {
+        String formattedMessage = String.format("%s - %s: %s", message.timestamp(), message.username(), message.message());
         for (ConnectionHandler ch : connections) {
             if (ch != null) {
-                ch.sendMessage(message);
+                ch.sendMessage(formattedMessage);
             }
         }
+    }
+
+    public void broadcast(Message message, String token) {
+        String formattedMessage = String.format("%s - %s: %s", message.timestamp(), message.username(), message.message());
+        connections.stream()
+                .filter(con -> con.getToken().equals(token))
+                .forEach(con -> con.sendMessage(formattedMessage));
     }
 
     public void shutdown() {
@@ -57,6 +80,7 @@ public class Server implements Runnable {
             for (ConnectionHandler ch : connections) {
                 ch.shutdown();
             }
+            databaseService.close();
         } catch (IOException e) {
             // ignore
         }
@@ -64,11 +88,13 @@ public class Server implements Runnable {
 
     class ConnectionHandler implements Runnable {
         private final Socket client;
+        private final String token;
         private BufferedReader in;
         private PrintWriter out;
 
         public ConnectionHandler(Socket client) {
             this.client = client;
+            this.token = UUID.randomUUID().toString();
         }
 
         @Override
@@ -78,27 +104,13 @@ public class Server implements Runnable {
                 in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                 out.println("Please enter a nickname: ");
                 String nickname = in.readLine();
-                System.out.println(nickname + " connected to the server.");
-                broadcast(nickname + " joined the chat!");
+                String joinedMessage = String.format("%s joined the chat!", nickname);
+                broadcast(new Message(joinedMessage, nickname));
                 String message;
                 while ((message = in.readLine()) != null) {
-                    if (message.startsWith("/nick ")) {
-                        String[] messageSplit = message.split(" ", 2);
-                        if (messageSplit.length == 2) {
-                            broadcast(nickname + " changed his nickname to: " + messageSplit[1]);
-                            System.out.println(nickname + " changed his nickname to: " + messageSplit[1]);
-                            nickname = messageSplit[1];
-                            out.println("Nickname changed successfully");
-                        } else {
-                            out.println("No nickname provided");
-                        }
-                        // todo: handle nickname change
-                    } else if (message.startsWith("/quit ")) {
-                        broadcast(nickname + " - leaves the chat.");
-                        shutdown();
-                    } else {
-                        broadcast(nickname + ": " + message);
-                    }
+                    Message messageObject = new Message(message, nickname);
+                    databaseService.saveMessage(messageObject);
+                    broadcast(messageObject);
                 }
             } catch (Exception e) {
                 shutdown();
@@ -111,6 +123,7 @@ public class Server implements Runnable {
 
         public void shutdown() {
             try {
+                connections.remove(this);
                 if (in != null) {
                     in.close();
                 }
@@ -119,8 +132,12 @@ public class Server implements Runnable {
                     client.close();
                 }
             } catch (IOException e) {
-                // ingore
+                // ignore
             }
+        }
+
+        public String getToken() {
+            return token;
         }
     }
 

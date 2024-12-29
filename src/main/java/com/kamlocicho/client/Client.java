@@ -35,6 +35,8 @@ public class Client {
 
         sendButton.addActionListener(e -> sendMessage());
         inputField.addActionListener(e -> sendMessage());
+
+        // todo: Close the TCP connection when closing GUI
     }
 
     public void connect() {
