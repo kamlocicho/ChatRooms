@@ -6,6 +6,8 @@ import java.sql.*;
 
 public class DatabaseService {
 
+    private static volatile DatabaseService instance;
+
     private Connection connection;
 
     public DatabaseService() {
@@ -27,6 +29,20 @@ public class DatabaseService {
         }
     }
 
+    // Implemented singleton pattern to ensure only one instance of the DatabaseService class is created
+    public static DatabaseService getInstance() {
+        DatabaseService localInstance = instance;
+        if (localInstance == null) {
+            synchronized (DatabaseService.class) {
+                localInstance = instance;
+                if (localInstance == null) {
+                    instance = localInstance = new DatabaseService();
+                }
+            }
+        }
+        return localInstance;
+    }
+
     public Message[] getRecentMessages(int count) {
         Message[] messages = new Message[count];
         try (PreparedStatement statement = connection.prepareStatement("SELECT * FROM messages ORDER BY id DESC LIMIT ?")) {
@@ -34,7 +50,11 @@ public class DatabaseService {
             ResultSet resultSet = statement.executeQuery();
             int i = 0;
             while (resultSet.next()) {
-                messages[i] = new Message(resultSet.getInt("id"), resultSet.getString("message"), resultSet.getString("timestamp"), resultSet.getString("username"));
+                messages[i] = new Message(
+                        resultSet.getInt("id"),
+                        resultSet.getString("message"),
+                        resultSet.getString("timestamp"),
+                        resultSet.getString("username"));
                 i++;
             }
         } catch (SQLException e) {

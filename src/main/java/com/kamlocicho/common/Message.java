@@ -18,7 +18,4 @@ public record Message(int id, String message, String timestamp, String username)
     public Message(String message, String username) {
         this(-1, message, LocalDateTime.now().toString(), username);
     }
-    public Message(String message, String timestamp, String username) {
-        this(-1, message, timestamp, username);
-    }
 }

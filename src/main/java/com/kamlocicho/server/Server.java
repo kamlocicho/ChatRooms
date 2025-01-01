@@ -20,7 +20,6 @@ public class Server implements Runnable {
     private ServerSocket server;
     private boolean done;
     private ExecutorService pool;
-    private final DatabaseService databaseService = new DatabaseService();
 
     public Server() {
         connections = new ArrayList<>();
@@ -47,6 +46,7 @@ public class Server implements Runnable {
     }
 
     private void loadOldMessages(ConnectionHandler ch) {
+        DatabaseService databaseService = DatabaseService.getInstance();
         Message[] messages = databaseService.getRecentMessages(5);
         Arrays.stream(messages)
                 .filter(Objects::nonNull)
@@ -72,6 +72,7 @@ public class Server implements Runnable {
     }
 
     public void shutdown() {
+        DatabaseService databaseService = DatabaseService.getInstance();
         try {
             done = true;
             if (!server.isClosed()) {
@@ -99,6 +100,7 @@ public class Server implements Runnable {
 
         @Override
         public void run() {
+            DatabaseService databaseService = DatabaseService.getInstance();
             try {
                 out = new PrintWriter(client.getOutputStream(), true);
                 in = new BufferedReader(new InputStreamReader(client.getInputStream()));
